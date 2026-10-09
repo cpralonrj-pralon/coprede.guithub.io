@@ -20,7 +20,7 @@ Não é necessário instalar Node.js, servidores de aplicação ou gerenciadores
 
 1. Baixe ou clone este repositório:
    ```bash
-   git clone https://github.com/SEU-USUARIO/FAQ-QOE.git
+   git clone https://github.com/cpralonrj-pralon/coprede.guithub.io.git
    ```
 2. Abra o arquivo `index.html` diretamente em qualquer navegador moderno (Chrome, Edge, Firefox, Safari).
 
@@ -35,7 +35,7 @@ Para disponibilizar o guia online gratuitamente via **GitHub Pages**:
 3. Em **Build and deployment** > **Source**, selecione `Deploy from a branch`.
 4. Escolha a branch `main` e a pasta `/ (root)`.
 5. Clique em **Save**.
-6. Em instantes, o site estará acessível no link fornecido pelo GitHub (ex: `https://seu-usuario.github.io/FAQ-QOE/`).
+6. Em instantes, o site estará acessível no link fornecido pelo GitHub (ex: `https://cpralonrj-pralon.github.io/coprede.guithub.io/`).
 
 ---
 
