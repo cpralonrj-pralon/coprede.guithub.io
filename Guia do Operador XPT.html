@@ -175,7 +175,31 @@ mark.hit.cur{background:var(--hit-cur);color:#fff;box-shadow:0 0 0 2px var(--hit
 }
 @media (prefers-reduced-motion:reduce){nav.side{transition:none}}
 
-  </style>
+  
+/* Editor CSS */
+.edit-btn { border:1px solid var(--line); background:transparent; border-radius:6px; height:36px; padding:0 10px; cursor:pointer; font:inherit; font-size:13px; display:inline-flex; align-items:center; gap:6px; flex:none; color:var(--fg); }
+.edit-btn:hover { background:var(--zebra); }
+body.editing [contenteditable="true"] { outline: 1.5px dashed var(--teal); outline-offset: 2px; border-radius: 3px; cursor: text; }
+body.editing [contenteditable="true"]:focus { outline: 2px solid var(--accent); background: color-mix(in srgb, var(--teal) 12%, transparent); }
+
+.editor-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 12px; font-size: 13.5px; }
+.editor-bar .status { font-weight: 500; color: var(--fg); display: flex; align-items: center; gap: 8px; }
+.editor-bar button { border: 0; padding: 7px 14px; border-radius: 6px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.editor-bar .btn-pub { background: var(--accent); color: #fff; }
+.editor-bar .btn-pub:hover { opacity: 0.9; }
+.editor-bar .btn-cancel { background: var(--zebra); color: var(--fg); border: 1px solid var(--line); }
+
+.editor-modal-backdrop { position: fixed; inset: 0; z-index: 110; background: rgba(0,0,0,0.6); display: grid; place-items: center; padding: 16px; }
+.editor-modal { background: var(--surface); border-radius: 12px; padding: 24px; max-width: 480px; width: 100%; border: 1px solid var(--line); box-shadow: 0 15px 35px rgba(0,0,0,0.3); color: var(--fg); }
+.editor-modal h3 { margin: 0 0 12px; font-size: 18px; color: var(--teal); }
+.editor-modal p { font-size: 13.5px; color: var(--muted); margin: 0 0 16px; line-height: 1.5; }
+.editor-modal input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-family: var(--mono); font-size: 13px; margin-bottom: 16px; box-sizing: border-box; }
+.editor-modal .btns { display: flex; justify-content: flex-end; gap: 10px; }
+.editor-modal button { padding: 8px 16px; border-radius: 6px; font: inherit; font-weight: 500; cursor: pointer; border: 0; }
+.editor-modal .btn-save { background: var(--teal); color: #fff; }
+.editor-modal .btn-close { background: var(--zebra); color: var(--fg); border: 1px solid var(--line); }
+
+</style>
 </head>
 <body>
 
@@ -189,6 +213,7 @@ mark.hit.cur{background:var(--hit-cur);color:#fff;box-shadow:0 0 0 2px var(--hit
     <button id="next" aria-label="Próximo resultado" title="Próximo (Enter)" disabled>▼</button>
     <button id="clr" aria-label="Limpar busca" title="Limpar (Esc)" disabled>✕</button>
   </div>
+  <button class="edit-btn" id="edit-btn" title="Modo Edição / Publicação">✏️ Editar</button>
   <button class="theme" id="theme" aria-label="Alternar tema claro e escuro" title="Tema">◐</button>
 </header>
 <div class="scrim" id="scrim"></div>
@@ -358,6 +383,194 @@ mark.hit.cur{background:var(--hit-cur);color:#fff;box-shadow:0 0 0 2px var(--hit
     o.addEventListener('click',function(){o.remove()});document.body.appendChild(o);
   });
   document.addEventListener('keydown',function(e){if(e.key==='Escape'){var z=document.querySelector('.zoomed');if(z)z.remove()}});
+
+  /* GitHub Live Editor & Publisher */
+  var REPO_OWNER = 'cpralonrj-pralon';
+  var REPO_NAME = 'coprede.guithub.io';
+
+  var editBtn = $('edit-btn');
+  var isEditing = false;
+
+  function getGhToken() {
+    return localStorage.getItem('gh_token') || '';
+  }
+
+  function setGhToken(token) {
+    localStorage.setItem('gh_token', token.trim());
+  }
+
+  function showTokenModal(callback) {
+    var existing = document.getElementById('gh-token-modal');
+    if (existing) existing.remove();
+
+    var backdrop = document.createElement('div');
+    backdrop.id = 'gh-token-modal';
+    backdrop.className = 'editor-modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="editor-modal">
+        <h3>🔑 Autenticação de Editor (GitHub)</h3>
+        <p>Para salvar edições e publicar alterações visíveis para todos no site, insira o seu <b>Personal Access Token</b> do GitHub (com permissão <code>repo</code>).</p>
+        <input type="password" id="gh-token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" value="${getGhToken()}">
+        <p style="font-size:12px;"><a href="https://github.com/settings/tokens/new?scopes=repo&description=Editor+Guia+Operador" target="_blank" rel="noopener">Clique aqui para criar um token no GitHub</a></p>
+        <div class="btns">
+          <button class="btn-close" id="gh-modal-cancel">Cancelar</button>
+          <button class="btn-save" id="gh-modal-save">Salvar Token & Iniciar Edição</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+
+    var input = $('gh-token-input');
+    $('gh-modal-save').onclick = function() {
+      var val = input.value.trim();
+      if (!val) { alert('Por favor, informe o token do GitHub.'); return; }
+      setGhToken(val);
+      backdrop.remove();
+      if (callback) callback();
+    };
+    $('gh-modal-cancel').onclick = function() {
+      backdrop.remove();
+    };
+  }
+
+  function toggleEditMode(enable) {
+    isEditing = (enable !== undefined) ? enable : !isEditing;
+    document.body.classList.toggle('editing', isEditing);
+
+    var editableSelector = '#content h1, #content h2, #content h3, #content h4, #content p, #content td, #content th, #content li, .hero .k, .meta span';
+    document.querySelectorAll(editableSelector).forEach(function(el) {
+      if (isEditing) {
+        el.setAttribute('contenteditable', 'true');
+        el.setAttribute('spellcheck', 'false');
+      } else {
+        el.removeAttribute('contenteditable');
+      }
+    });
+
+    var bar = document.getElementById('editor-bar');
+    if (isEditing) {
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'editor-bar';
+        bar.className = 'editor-bar';
+        bar.innerHTML = `
+          <div class="status">✏️ <span>Modo Edição Ativo</span></div>
+          <button class="btn-cancel" id="btn-change-token" title="Alterar Token">🔑 Token</button>
+          <button class="btn-cancel" id="btn-cancel-edit">Descartar</button>
+          <button class="btn-pub" id="btn-publish">💾 Salvar & Publicar no GitHub</button>
+        `;
+        document.body.appendChild(bar);
+
+        $('btn-change-token').onclick = function() { showTokenModal(); };
+        $('btn-cancel-edit').onclick = function() { toggleEditMode(false); location.reload(); };
+        $('btn-publish').onclick = function() { publishToGitHub(); };
+      }
+    } else {
+      if (bar) bar.remove();
+    }
+  }
+
+  if (editBtn) {
+    editBtn.addEventListener('click', function() {
+      if (isEditing) {
+        toggleEditMode(false);
+      } else {
+        if (!getGhToken()) {
+          showTokenModal(function() { toggleEditMode(true); });
+        } else {
+          toggleEditMode(true);
+        }
+      }
+    });
+  }
+
+  async function getFileSha(path, token) {
+    var url = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + path;
+    var res = await fetch(url, {
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Token do GitHub inválido ou sem permissão.');
+      throw new Error('Erro ao buscar arquivo no GitHub: ' + res.statusText);
+    }
+    var data = await res.json();
+    return data.sha;
+  }
+
+  async function updateFileOnGitHub(path, htmlContent, sha, token) {
+    var url = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + path;
+    
+    var utf8Bytes = new TextEncoder().encode(htmlContent);
+    var binaryString = Array.from(utf8Bytes, b => String.fromCharCode(b)).join('');
+    var b64 = btoa(binaryString);
+
+    var res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: 'Atualização do Guia via editor web',
+        content: b64,
+        sha: sha,
+        branch: 'main'
+      })
+    });
+
+    if (!res.ok) {
+      var errData = await res.json().catch(function(){return {};});
+      throw new Error(errData.message || ('Erro ao salvar no GitHub: ' + res.statusText));
+    }
+    return await res.json();
+  }
+
+  async function publishToGitHub() {
+    var token = getGhToken();
+    if (!token) {
+      showTokenModal(function() { publishToGitHub(); });
+      return;
+    }
+
+    var barStatus = document.querySelector('#editor-bar .status span');
+    var pubBtn = $('btn-publish');
+
+    try {
+      pubBtn.disabled = true;
+      if (barStatus) barStatus.textContent = '⏳ Preparando publicação...';
+
+      document.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); });
+      var editorBar = $('editor-bar');
+      if (editorBar) editorBar.remove();
+
+      var docHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+      if (barStatus) barStatus.textContent = '⏳ Conectando ao GitHub API...';
+
+      var shaIndex = await getFileSha('index.html', token);
+      await updateFileOnGitHub('index.html', docHtml, shaIndex, token);
+
+      try {
+        var shaGuia = await getFileSha('Guia do Operador XPT.html', token);
+        await updateFileOnGitHub('Guia do Operador XPT.html', docHtml, shaGuia, token);
+      } catch(e) {
+        console.warn('Aviso ao atualizar arquivo secundário:', e);
+      }
+
+      alert('✅ Publicado com sucesso!\n\nAs alterações foram salvas no GitHub. Em cerca de 30 a 60 segundos o site estará atualizado para todos os usuários!');
+      location.reload();
+    } catch(err) {
+      alert('❌ Falha ao publicar: ' + err.message);
+      if (barStatus) barStatus.textContent = 'Modo Edição Ativo';
+      pubBtn.disabled = false;
+      toggleEditMode(true);
+    }
+  }
+
 })();
 </script>
 
